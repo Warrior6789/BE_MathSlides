@@ -1,0 +1,6 @@
+@MathSlidesBe_HostAddress = http://localhost:5159
+
+GET {{MathSlidesBe_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

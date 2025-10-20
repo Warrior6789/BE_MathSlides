@@ -1,0 +1,8 @@
+# Visual Studio files
+.vs/
+
+# Binaries and intermediate files
+[Dd]ebug/
+[Rr]elease/
+**/bin/
+**/obj/
