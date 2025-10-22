@@ -1,6 +1,7 @@
 ﻿using MathSlidesBe.Entity.Enum;
 using MathSlidesBe.Models.Dto;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -42,5 +43,28 @@ namespace MathSlidesBe.Controller
             return Unauthorized(new { message = "Đăng nhập thất bại! Vui lòng kiểm tra lại tài khoản và mật khẩu hoặc chờ được phê duyệt" });
         }
 
+        [Authorize]
+        [HttpPost("logout")]
+        public async Task<ActionResult> Logout()
+        {
+            await HttpContext.SignOutAsync("MyCookieAuth");
+            return Ok(new { message = "Logout success" });
+        }
+
+        [Authorize]
+        [HttpGet("me")]
+        public IActionResult Me()
+        {
+            if (User.Identity?.IsAuthenticated ?? false)
+            {
+                return Ok(new
+                {
+                    username = User.Identity.Name,
+                    role = User.Claims.Where(c => c.Type == ClaimTypes.Role).Select(c => c.Value),
+                    userId = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value
+                });
+            }
+            return Unauthorized();
+        }
     }
 }
