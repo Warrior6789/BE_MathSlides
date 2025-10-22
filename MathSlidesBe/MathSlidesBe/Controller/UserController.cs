@@ -76,5 +76,58 @@ namespace MathSlidesBe.Controller
             };
             return Ok(BaseResponse<UserProfile>.Ok(dataUser,"Lấy chi tiết thành công"));
         }
+
+        [Authorize(Roles = "Admin")]
+        [HttpGet("GetAllUsers")]
+        public async Task<ActionResult<BaseResponse<PagedResult<User>>>> GetPaged(int pageIndex = 1, int pageSize = 10, string? search = null, UserStatus? status = null)
+        {
+            Expression<Func<User, bool>> filter = u => true;
+            if (!string.IsNullOrEmpty(search))
+            {
+                search = search.ToLower();
+                filter = (u => u.FullName.ToLower().Contains(search) || u.Email.ToLower().Contains(search) || u.PhoneNumber.ToLower().Contains(search));
+            }
+
+            var query = _repository.Query(filter);
+
+            if (status.HasValue)
+            {
+                query = query.Where(u => u.UserStatus == status.Value);
+            }
+
+            var totalItems = await query.CountAsync();
+            var items = await query.OrderByDescending(u => u.UpdatedAt).Skip((pageIndex - 1) * pageSize).Take(pageSize).ToListAsync();
+
+            foreach (var user in items)
+            {
+                user.PasswordHash = null;
+            }
+
+            var result = new PagedResult<User>
+            {
+                Items = items,
+                PageIndex = pageIndex,
+                PageSize = pageSize,
+                TotalItems = totalItems
+            };
+            return Ok(BaseResponse<PagedResult<User>>.Ok(result,"Lấy dữ liệu phân trang thành công "));
+        }
+
+        [Authorize(Roles = "Admin")]
+        [HttpPut("{id:guid}/update-status")]
+        public async Task<ActionResult<BaseResponse<Object>>> UpdateUserStatus(Guid id, [FromQuery] UserStatus status)
+        {
+            var userExisted = await _context.Users.FirstOrDefaultAsync(u => u.Id == id);
+            if(userExisted == null)
+            {
+                return NotFound(BaseResponse<Object>.Fail("Không tìm thấy người dùng"));
+            }
+            userExisted.UserStatus = status;
+            userExisted.UpdatedAt = DateTime.UtcNow;
+            _context.Users.Update(userExisted);
+            await _context.SaveChangesAsync();
+            return Ok(BaseResponse<Object>.Ok(null,"Cập nhật trạng thái người dùng thành công")); 
+
+        }
     }
 }
