@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Mapster;
+using Microsoft.EntityFrameworkCore;
 
 namespace MathSlidesBe.Controller
 {
@@ -63,6 +64,34 @@ namespace MathSlidesBe.Controller
             await _repository.DeleteAsync(id);
             return Ok(BaseResponse<Object>.Ok(null, "Xoá trường thành công"));
 
+        }
+
+        [HttpPost("paged")]
+        public async Task<ActionResult<BaseResponse<PagedResult<School>>>> GetPaged(
+            int pageIndex = 1,
+            int pageSize = 10,
+            string? keyworld = null)
+        {
+            var query = _repository.Query(x => !x.IsDeleted);
+            if (!string.IsNullOrEmpty(keyworld))
+            {
+                var keywordLower = keyworld.ToLower();
+                query.Where(x => x.SchoolName.ToLower().Contains(keywordLower) ||(x.Address != null && x.Address.ToLower().Contains(keywordLower)) || x.SchoolCode.ToLower().Contains(keywordLower));
+            }
+            var totalItems = await query.CountAsync();
+            var items = await query
+                .OrderBy(s => s.SchoolName)
+                .Skip((pageIndex - 1) * pageSize)
+                .Take(pageSize)
+                .ToArrayAsync();
+            var pagedResult = new PagedResult<School>
+            {
+                Items = items,
+                TotalItems = totalItems,
+                PageIndex = pageIndex,
+                PageSize = pageSize
+            };
+            return Ok(BaseResponse<PagedResult<School>>.Ok(pagedResult,"Lấy thành công"));
         }
     }
 }
