@@ -2,5 +2,7 @@
 {
     public class PresentationCreateDto
     {
+        public Guid lessonId { get; set; }
+        public string? title { get; set; }
     }
 }
