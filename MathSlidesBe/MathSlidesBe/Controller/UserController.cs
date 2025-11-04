@@ -15,22 +15,22 @@ namespace MathSlidesBe.Controller
     [ApiController]
     public class UserController : ControllerBase
     {
-        private readonly MathSlidesDbContext _context;
-        private readonly IRepository<User> _repository;
-        public UserController(MathSlidesDbContext context, IRepository<User> repository)
+        private readonly IRepository<User> _userRepository;
+        private readonly IRepository<School> _schoolRepository;
+        public UserController(IRepository<User> repository, IRepository<School> schoolRepository)
         {
-            _context = context;
-            _repository = repository;
+            _userRepository = repository;
+            _schoolRepository = schoolRepository;
         }
         [HttpPost("register")]
         public async Task<IActionResult> Register([FromBody] RegisterDto dto)
         {
-            var checkSchool = await _context.Schools.FirstOrDefaultAsync(s => s.Id == dto.SchoolId);
+            var checkSchool = await _schoolRepository.FirstOrDefaultAsync(s => s.Id == dto.SchoolId);
             if(checkSchool == null)
             {
                return BadRequest(new { message = "Trường không hợp lệ." });
             }
-            var existingUser = await _context.Users.FirstOrDefaultAsync(u => u.Email == dto.Email);
+            var existingUser = await _userRepository.FirstOrDefaultAsync(u => u.Email == dto.Email);
             if(existingUser != null)
             {
                 return BadRequest(new { message = "Email đã được sử dụng." });
@@ -48,8 +48,7 @@ namespace MathSlidesBe.Controller
                 UserStatus = UserStatus.Pending
             };
 
-            _context.Users.Add(user);
-            await _context.SaveChangesAsync();
+            await _userRepository.AddAsync(user);
             return Ok(new
             {
                 user.Id,
@@ -65,7 +64,11 @@ namespace MathSlidesBe.Controller
         public async Task<ActionResult<BaseResponse<UserProfile>>> MyProfile()
         {
             var currentUser = User.Identity?.Name;
-            var userExisted = _context.Users.Include(it => it.School).FirstOrDefault(u => u.Email == currentUser) ?? throw new ArgumentNullException(nameof(currentUser), "Người dùng không tồn tại");
+            var userExisted = await _userRepository.QueryWithIncludes(u => u.Email == currentUser, u => u.School).FirstOrDefaultAsync();
+            if (userExisted == null)
+            {
+                return NotFound(BaseResponse<UserProfile>.Fail("Người dùng không tồn tại"));
+            }
             var dataUser = new UserProfile
             {
                 FullName = userExisted.FullName,
@@ -89,7 +92,7 @@ namespace MathSlidesBe.Controller
                 filter = (u => u.FullName.ToLower().Contains(search) || u.Email.ToLower().Contains(search) || u.PhoneNumber.ToLower().Contains(search));
             }
 
-            var query = _repository.Query(filter);
+            var query = _userRepository.QueryWithIncludes(filter, u => u.School);
 
             if (status.HasValue)
             {
@@ -118,15 +121,14 @@ namespace MathSlidesBe.Controller
         [HttpPut("{id:guid}/update-status")]
         public async Task<ActionResult<BaseResponse<Object>>> UpdateUserStatus(Guid id, [FromQuery] UserStatus status)
         {
-            var userExisted = await _context.Users.FirstOrDefaultAsync(u => u.Id == id);
+            var userExisted = await _userRepository.FirstOrDefaultAsync(u => u.Id == id);
             if(userExisted == null)
             {
                 return NotFound(BaseResponse<Object>.Fail("Không tìm thấy người dùng"));
             }
             userExisted.UserStatus = status;
             userExisted.UpdatedAt = DateTime.UtcNow;
-            _context.Users.Update(userExisted);
-            await _context.SaveChangesAsync();
+            await _userRepository.UpdateAsync(userExisted);
             return Ok(BaseResponse<Object>.Ok(null,"Cập nhật trạng thái người dùng thành công")); 
 
         }
