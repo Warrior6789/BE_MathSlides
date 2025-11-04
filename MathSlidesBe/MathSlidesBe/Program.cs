@@ -16,7 +16,11 @@ namespace MathSlidesBe
             builder.Services.AddDbContext<MathSlidesDbContext>();
             builder.Services.AddScoped(typeof(IRepository<>),typeof(Repository<>));
             // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
-            builder.Services.AddControllers();
+            builder.Services.AddControllers()
+                .AddJsonOptions(options =>
+                {
+                    options.JsonSerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles;
+                });
             builder.Services.AddEndpointsApiExplorer();
             builder.Services.AddSwaggerGen();
             builder.Services.AddAuthentication("MyCookieAuth")
@@ -42,6 +46,7 @@ namespace MathSlidesBe
 
             app.UseHttpsRedirection();
 
+            app.UseAuthentication();
             app.UseAuthorization();
 
             app.MapControllers();
