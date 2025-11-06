@@ -15,6 +15,5 @@ namespace MathSlidesBe.Models.Dto
         public string Password { get; set; }
         [Required]
         public Guid SchoolId { get; set; }
-        public UserRole Role { get; set; } = UserRole.Teacher;
     }
 }

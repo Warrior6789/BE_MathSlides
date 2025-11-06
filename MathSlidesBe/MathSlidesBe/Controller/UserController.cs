@@ -43,7 +43,7 @@ namespace MathSlidesBe.Controller
                 Email = dto.Email,
                 PhoneNumber = dto.phoneNumber,
                 PasswordHash = passwordHash,
-                Role = dto.Role,
+                Role = UserRole.Teacher,
                 SchoolID = dto.SchoolId,
                 UserStatus = UserStatus.Pending
             };
