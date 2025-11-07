@@ -62,7 +62,7 @@ namespace MathSlidesBe.BaseRepo
             {
                 query = query.Include(include);
             }
-            return await query.AsNoTracking().FirstOrDefaultAsync();
+            return await query.FirstOrDefaultAsync();
         }
 
         public async Task<TEntity> FindAsync(Guid id)
