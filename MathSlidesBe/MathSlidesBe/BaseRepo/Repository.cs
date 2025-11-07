@@ -23,6 +23,9 @@ namespace MathSlidesBe.BaseRepo
         public async Task<TEntity?> GetByIdAsync(Guid id)
             => await _dbSet.FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted);
 
+        public async Task<TEntity?> FirstOrDefaultAsync(Expression<Func<TEntity, bool>> predicate)
+            => await _dbSet.FirstOrDefaultAsync(predicate);
+
         public async Task<TEntity> AddAsync(TEntity entity)
         {
             entity.UpdatedAt = DateTime.Now;
@@ -51,6 +54,16 @@ namespace MathSlidesBe.BaseRepo
         }
 
         public IQueryable<TEntity> Query(Expression<Func<TEntity, bool>> predicate) => _dbSet.Where(predicate);
+
+        public IQueryable<TEntity> QueryWithIncludes(Expression<Func<TEntity, bool>> predicate, params Expression<Func<TEntity, object>>[] includes)
+        {
+            IQueryable<TEntity> query = _dbSet.Where(predicate);
+            foreach (var include in includes)
+            {
+                query = query.Include(include);
+            }
+            return query;
+        }
 
         public async Task<PagedResult<TEntity>> GetPagedAsync(int pageIndex, int pageSize)
     => await _dbSet.AsQueryable().Where(x => !x.IsDeleted).ToPagedResultAsync(pageIndex, pageSize);
