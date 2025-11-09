@@ -2,323 +2,286 @@
 using MathSlidesBe.Common;
 using MathSlidesBe.Entity;
 using MathSlidesBe.Models.Dto;
+using MathSlidesBe.Models.ViewModel;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Security.Claims;
 using System.Text.Json;
-using System.Threading.Tasks;
 
 namespace MathSlidesBe.Controllers
 {
-    // ViewModels to match frontend structure
-    public class ComponentPropertiesViewModel
-    {
-        public double X { get; set; }
-        public double Y { get; set; }
-        public double Width { get; set; }
-        public double Height { get; set; }
-        public string Content { get; set; }
-        public double Rotation { get; set; }
-        public double FontSize { get; set; }
-        public string Color { get; set; }
-        public string BackgroundColor { get; set; }
-        public bool IsBold { get; set; }
-        public bool IsItalic { get; set; }
-        public bool IsUnderline { get; set; }
-    }
-
-    public class ComponentViewModel
-    {
-        public Guid? Id { get; set; }
-        public Guid? SlideID { get; set; }
-        public string ComponentType { get; set; }
-        public ComponentPropertiesViewModel? Properties { get; set; }
-        public int ZIndex { get; set; }
-    }
-
-    public class SlideViewModel
-    {
-        public Guid? Id { get; set; }
-        public Guid? PresentationID { get; set; }
-        public int PageNumber { get; set; }
-        public List<ComponentViewModel>? Components { get; set; }
-    }
-
-    public class PresentationViewModel
-    {
-        public Guid? Id { get; set; }
-        public string Title { get; set; }
-        public Guid UserID { get; set; }
-        public Guid LessonID { get; set; }
-        public List<SlideViewModel>? Slides { get; set; }
-    }
-
-    [Route("api/[controller]")]
-    [ApiController]
-    public class PresentationController : ControllerBase
-    {
-        private readonly IRepository<Presentation> _repository;
-        private readonly MathSlidesDbContext _context;
-        private static readonly JsonSerializerOptions _jsonOptions = new JsonSerializerOptions
+        [Route("api/[controller]")]
+        [ApiController]
+        public class PresentationController : ControllerBase
         {
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-            AllowTrailingCommas = true
-        };
-
-        public PresentationController(IRepository<Presentation> repository, MathSlidesDbContext context)
-        {
-            _repository = repository;
-            _context = context;
-        }
-
-        [HttpGet("{id:guid}")]
-        [Authorize]
-        public async Task<ActionResult<BaseResponse<PresentationViewModel>>> GetById(Guid id)
-        {
-            var currentUserId = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value;
-            if (currentUserId == null || !Guid.TryParse(currentUserId, out var userId))
+            private readonly IRepository<Presentation> _presentationRepository;
+            private readonly IRepository<Slide> _slideRepository;
+            private static readonly JsonSerializerOptions _jsonOptions = new JsonSerializerOptions
             {
-                return Unauthorized(BaseResponse<PresentationViewModel>.Fail("User is not authenticated."));
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                AllowTrailingCommas = true
+            };
+
+            public PresentationController(IRepository<Presentation> PresentationRepository, IRepository<Slide> _SlideRepository)
+            {
+                _presentationRepository = PresentationRepository;
+                _slideRepository = _SlideRepository;
             }
 
-            var presentation = await _context.Presentations.Where(p => !p.IsDeleted)
-                                     .Include(p => p.Slides)
-                                     .ThenInclude(s => s.Components)
-                                     .AsNoTracking()
-                                     .FirstOrDefaultAsync(p => p.Id == id);
-
-            if (presentation == null)
+            [HttpGet("{id:guid}")]
+            [Authorize]
+            public async Task<ActionResult<BaseResponse<PresentationViewModel>>> GetById(Guid id)
             {
-                return NotFound(BaseResponse<PresentationViewModel>.Fail($"Presentation with id {id} not found."));
-            }
-
-            if (presentation.UserID != userId)
-            {
-                return StatusCode(StatusCodes.Status403Forbidden, BaseResponse<PresentationViewModel>.Fail("User is not authorized to view this presentation."));
-            }
-
-            var presentationViewModel = new PresentationViewModel
-            {
-                Id = presentation.Id,
-                Title = presentation.Title,
-                UserID = presentation.UserID,
-                LessonID = presentation.LessonID,
-                Slides = presentation.Slides.Select(s => new SlideViewModel
+                var currentUserId = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value;
+                if (currentUserId == null || !Guid.TryParse(currentUserId, out var userId))
                 {
-                    Id = s.Id,
-                    PresentationID = s.PresentationID,
-                    PageNumber = s.PageNumber,
-                    Components = s.Components.Select(c => new ComponentViewModel
-                    {
-                        Id = c.Id,
-                        SlideID = c.SlideID,
-                        ComponentType = c.ComponentType,
-                        Properties = JsonSerializer.Deserialize<ComponentPropertiesViewModel>(c.Properties, _jsonOptions),
-                        ZIndex = c.ZIndex
-                    }).ToList()
-                }).ToList()
-            };
+                    return Unauthorized(BaseResponse<PresentationViewModel>.Fail("User is not authenticated."));
+                }
 
-            return Ok(BaseResponse<PresentationViewModel>.Ok(presentationViewModel, "Presentation retrieved successfully."));
-        }
+                var presentation = await _presentationRepository.GetByIdWithIncludesAsync(
+                    id,
+                    p => p.Slides,
+                    p => p.Slides.SelectMany(s => s.Components)
+                    );
 
-        [HttpGet("show-slide/{id:guid}")]
-        [AllowAnonymous]
-        public async Task<ActionResult<BaseResponse<PresentationViewModel>>> GetShowSlide(Guid id)
-        {
-            var presentation = await _context.Presentations.Where(p => !p.IsDeleted)
-                                     .Include(p => p.Slides)
-                                     .ThenInclude(s => s.Components)
-                                     .AsNoTracking()
-                                     .FirstOrDefaultAsync(p => p.Id == id);
-
-            if (presentation == null)
-            {
-                return NotFound(BaseResponse<PresentationViewModel>.Fail($"Presentation with id {id} not found."));
-            }
-
-            var presentationViewModel = new PresentationViewModel
-            {
-                Id = presentation.Id,
-                Title = presentation.Title,
-                UserID = presentation.UserID,
-                LessonID = presentation.LessonID,
-                Slides = presentation.Slides.Select(s => new SlideViewModel
+                if (presentation == null)
                 {
-                    Id = s.Id,
-                    PresentationID = s.PresentationID,
-                    PageNumber = s.PageNumber,
-                    Components = s.Components.Select(c => new ComponentViewModel
+                    return NotFound(BaseResponse<PresentationViewModel>.Fail($"Presentation with id {id} not found."));
+                }
+
+                if (presentation.UserID != userId)
+                {
+                    return StatusCode(StatusCodes.Status403Forbidden, BaseResponse<PresentationViewModel>.Fail("User is not authorized to view this presentation."));
+                }
+
+                var presentationViewModel = new PresentationViewModel
+                {
+                    Id = presentation.Id,
+                    Title = presentation.Title,
+                    UserID = presentation.UserID,
+                    LessonID = presentation.LessonID,
+                    Slides = presentation.Slides.Select(s => new SlideViewModel
                     {
-                        Id = c.Id,
-                        SlideID = c.SlideID,
-                        ComponentType = c.ComponentType,
-                        Properties = JsonSerializer.Deserialize<ComponentPropertiesViewModel>(c.Properties, _jsonOptions),
-                        ZIndex = c.ZIndex
+                        Id = s.Id,
+                        PresentationID = s.PresentationID,
+                        PageNumber = s.PageNumber,
+                        Components = s.Components.Select(c => new ComponentViewModel
+                        {
+                            Id = c.Id,
+                            SlideID = c.SlideID,
+                            ComponentType = c.ComponentType,
+                            Properties = JsonSerializer.Deserialize<ComponentPropertiesViewModel>(c.Properties, _jsonOptions),
+                            ZIndex = c.ZIndex
+                        }).ToList()
                     }).ToList()
-                }).ToList()
-            };
+                };
 
-            return Ok(BaseResponse<PresentationViewModel>.Ok(presentationViewModel, "Presentation retrieved successfully."));
-        }
-
-
-        [HttpPost]
-        public async Task<ActionResult<BaseResponse<PresentationViewModel>>> Create([FromBody] PresentationCreateDto dto)
-        {
-            var lessonId = dto.lessonId;
-            var title = dto.title;
-            if (lessonId == Guid.Empty)
-            {
-                return BadRequest(BaseResponse<PresentationViewModel>.Fail("Invalid lessonId"));
+                return Ok(BaseResponse<PresentationViewModel>.Ok(presentationViewModel, "Presentation retrieved successfully."));
             }
 
-            var presentation = new Presentation
+            [HttpGet("show-slide/{id:guid}")]
+            [AllowAnonymous]
+            public async Task<ActionResult<BaseResponse<PresentationViewModel>>> GetShowSlide(Guid id)
             {
-                Title = string.IsNullOrWhiteSpace(title) ? "New Presentation" : title,
-                LessonID = lessonId
-            };
-            var currentUserId = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value;
-            if (currentUserId == null || !Guid.TryParse(currentUserId, out var userId))
-            {
-                return Unauthorized(BaseResponse<PresentationViewModel>.Fail("User is not authenticated."));
+                var presentation = await _presentationRepository.GetByIdWithIncludesAsync(
+                        id,
+                         p => p.Slides,
+                        p => p.Slides.SelectMany(s => s.Components)
+                    );
+
+                if (presentation == null)
+                {
+                    return NotFound(BaseResponse<PresentationViewModel>.Fail($"Presentation with id {id} not found."));
+                }
+
+                var presentationViewModel = new PresentationViewModel
+                {
+                    Id = presentation.Id,
+                    Title = presentation.Title,
+                    UserID = presentation.UserID,
+                    LessonID = presentation.LessonID,
+                    Slides = presentation.Slides.Select(s => new SlideViewModel
+                    {
+                        Id = s.Id,
+                        PresentationID = s.PresentationID,
+                        PageNumber = s.PageNumber,
+                        Components = s.Components.Select(c => new ComponentViewModel
+                        {
+                            Id = c.Id,
+                            SlideID = c.SlideID,
+                            ComponentType = c.ComponentType,
+                            Properties = JsonSerializer.Deserialize<ComponentPropertiesViewModel>(c.Properties, _jsonOptions),
+                            ZIndex = c.ZIndex
+                        }).ToList()
+                    }).ToList()
+                };
+
+                return Ok(BaseResponse<PresentationViewModel>.Ok(presentationViewModel, "Presentation retrieved successfully."));
             }
-            presentation.UserID = userId;
-            var createdPresentation = await _repository.AddAsync(presentation);
 
-            var viewModel = new PresentationViewModel
+
+            [HttpPost]
+            [Authorize]
+            public async Task<ActionResult<BaseResponse<PresentationViewModel>>> Create([FromBody] PresentationCreateDto dto)
             {
-                Id = createdPresentation.Id,
-                Title = createdPresentation.Title,
-                UserID = createdPresentation.UserID,
-                LessonID = createdPresentation.LessonID,
-                Slides = new List<SlideViewModel>() // A new presentation has no slides
-            };
+                var lessonId = dto.lessonId;
+                var title = dto.title;
+                if (lessonId == Guid.Empty)
+                {
+                    return BadRequest(BaseResponse<PresentationViewModel>.Fail("Invalid lessonId"));
+                }
 
-            var response = BaseResponse<PresentationViewModel>.Ok(viewModel, "Presentation created successfully.");
+                var presentation = new Presentation
+                {
+                    Title = string.IsNullOrWhiteSpace(title) ? "New Presentation" : title,
+                    LessonID = lessonId
+                };
+                var currentUserId = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value;
+                if (currentUserId == null || !Guid.TryParse(currentUserId, out var userId))
+                {
+                    return Unauthorized(BaseResponse<PresentationViewModel>.Fail("User is not authenticated."));
+                }
+                presentation.UserID = userId;
+                var createdPresentation = await _presentationRepository.AddAsync(presentation);
 
-            return CreatedAtAction(nameof(GetById), new { id = viewModel.Id.Value }, response);
-        }
+                var viewModel = new PresentationViewModel
+                {
+                    Id = createdPresentation.Id,
+                    Title = createdPresentation.Title,
+                    UserID = createdPresentation.UserID,
+                    LessonID = createdPresentation.LessonID,
+                    Slides = new List<SlideViewModel>()
+                };
 
-        [HttpPut("{id:guid}")]
-        public async Task<IActionResult> Update(Guid id, [FromBody] PresentationViewModel dto)
-        {
-            if (dto.Id == null || id != dto.Id.Value)
-            {
-                return BadRequest(new { message = "Route ID and presentation ID in body do not match." });
+                var response = BaseResponse<PresentationViewModel>.Ok(viewModel, "Presentation created successfully.");
+
+                return CreatedAtAction(nameof(GetById), new { id = viewModel.Id.Value }, response);
             }
 
-            var currentUserId = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value;
-            if (currentUserId == null || !Guid.TryParse(currentUserId, out var userId))
+            [HttpPut("{id:guid}")]
+            [Authorize]
+            public async Task<IActionResult> Update(Guid id, [FromBody] PresentationViewModel dto)
             {
-                return Unauthorized(new { message = "User is not authenticated." });
-            }
+                if (dto.Id == null || id != dto.Id.Value)
+                {
+                    return BadRequest(new { message = "Route ID and presentation ID in body do not match." });
+                }
 
-            using (var transaction = await _context.Database.BeginTransactionAsync())
-            {
+                var currentUserId = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value;
+                if (currentUserId == null || !Guid.TryParse(currentUserId, out var userId))
+                {
+                    return Unauthorized(new { message = "User is not authenticated." });
+                }
+
                 try
                 {
-                    var presentation = await _context.Presentations
-                                             .Include(p => p.Slides)
-                                             .ThenInclude(s => s.Components)
-                                             .FirstOrDefaultAsync(p => p.Id == id);
-
-                    if (presentation == null)
+                    await _presentationRepository.ExcuteInTransactionAsync(async () =>
                     {
-                        return NotFound(new { message = $"Presentation with id {id} not found." });
-                    }
-
-                    if (presentation.UserID != userId)
-                    {
-                        return StatusCode(StatusCodes.Status403Forbidden, new { message = "User is not authorized to update this presentation." });
-                    }
-
-                    // Update scalar properties
-                    presentation.Title = dto.Title;
-
-                    // Remove old child entities using the change tracker
-                    _context.Slides.RemoveRange(presentation.Slides);
-
-                    // First save: commit the deletions and the title update
-                    await _context.SaveChangesAsync();
-
-                    if (dto.Slides != null && dto.Slides.Any())
-                    {
-                        var newSlides = dto.Slides.Select(sDto =>
+                        var presentation = await _presentationRepository.GetByIdWithIncludesAsync(id, p => p.Slides, p => p.Slides.SelectMany(s => s.Components)
+                        );
+                        if (presentation == null)
                         {
-                            var newSlide = new Slide
-                            {
-                                Id = Guid.NewGuid(),
-                                PresentationID = presentation.Id,
-                                PageNumber = sDto.PageNumber,
-                            };
+                            throw new KeyNotFoundException();
+                        }
+                        if (presentation.UserID != userId)
+                        {
+                            throw new UnauthorizedAccessException();
+                        }
+                        presentation.Title = dto.Title;
 
-                            if (sDto.Components != null)
+                        await _slideRepository.RemoveRangeAsync(presentation.Slides);
+
+                        await _presentationRepository.SaveChangeAsync();
+                        if (dto.Slides != null && dto.Slides.Any())
+                        {
+                            var newSlides = dto.Slides.Select(sdto =>
                             {
-                                newSlide.Components = sDto.Components.Select(cDto => new Component
+                                var newSlideId = Guid.NewGuid();
+
+                                var newSlide = new Slide
                                 {
-                                    Id = Guid.NewGuid(),
-                                    SlideID = newSlide.Id,
-                                    ComponentType = cDto.ComponentType,
-                                    ZIndex = cDto.ZIndex,
-                                    Properties = JsonSerializer.Serialize(cDto.Properties, _jsonOptions)
-                                }).ToList();
-                            }
+                                    Id = newSlideId,
+                                    PresentationID = presentation.Id,
+                                    PageNumber = sdto.PageNumber,
+                                };
 
-                            return newSlide;
-                        }).ToList();
-                        await _context.Slides.AddRangeAsync(newSlides);
+                                if (sdto.Components != null && sdto.Components.Any())
+                                {
+                                    newSlide.Components = sdto.Components.Select(cdto => new Component
+                                    {
+                                        Id = Guid.NewGuid(),
+                                        SlideID = newSlideId,  
+                                        ComponentType = cdto.ComponentType,
+                                        Properties = JsonSerializer.Serialize(cdto.Properties, _jsonOptions),
+                                        ZIndex = cdto.ZIndex
+                                    }).ToList();
+                                }
+
+                                return newSlide;
+
+                            }).ToList();
+
+                            await _slideRepository.AddRangeAsync(newSlides);
+                            await _presentationRepository.SaveChangeAsync();
+                        }
+
+                        return true;
                     }
+                    );
 
-                    await _context.SaveChangesAsync();
-
-                    await transaction.CommitAsync();
+                    return NoContent();
+                }
+                catch (KeyNotFoundException ex)
+                {
+                    return NotFound(new { Message = ex.Message });
+                }
+                catch (UnauthorizedAccessException ex)
+                {
+                    return StatusCode(StatusCodes.Status403Forbidden, new { message = ex.Message });
                 }
                 catch (DbUpdateConcurrencyException)
                 {
-                    await transaction.RollbackAsync();
-                    return StatusCode(StatusCodes.Status409Conflict, new { message = "The data was modified by another user. Please reload and try again." });
+                    return StatusCode(StatusCodes.Status409Conflict, new
+                    {
+                        message = "The data was modified by another user. Please reload and try again."
+                    });
                 }
                 catch (Exception)
                 {
-                    await transaction.RollbackAsync();
-                    //Log the exception
-                    return StatusCode(StatusCodes.Status500InternalServerError, new { message = "An error occurred during the update." });
+                    return StatusCode(StatusCodes.Status500InternalServerError,
+                    new
+                    {
+                        message = "An error occurred during the update."
+                    });
                 }
             }
 
-            return NoContent();
-        }
-
-        [HttpDelete("{id:guid}")]
-        [Authorize(Roles = "Admin,Teacher")]
-        public async Task<IActionResult> Delete(Guid id)
-        {
-            var currentUserId = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value;
-            if (currentUserId == null || !Guid.TryParse(currentUserId, out var userId))
+            [HttpDelete("{id:guid}")]
+            [Authorize(Roles = "Admin,Teacher")]
+            public async Task<IActionResult> Delete(Guid id)
             {
-                return Unauthorized(new { message = "User is not authenticated." });
+                var currentUserId = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value;
+                if (currentUserId == null || !Guid.TryParse(currentUserId, out var userId))
+                {
+                    return Unauthorized(new { message = "User is not authenticated." });
+                }
+
+                var presentation = await _presentationRepository.FindAsync(id);
+                if (presentation == null)
+                {
+                    return NotFound(new { message = $"Presentation with id {id} not found." });
+                }
+
+                if (presentation.UserID != userId)
+                {
+                    return StatusCode(StatusCodes.Status403Forbidden, new { message = "User is not authorized to delete this presentation." });
+                }
+
+                await _presentationRepository.DeleteAsync(id);
+
+                return NoContent();
             }
-
-            var presentation = await _context.Presentations.FindAsync(id);
-            if (presentation == null)
-            {
-                return NotFound(new { message = $"Presentation with id {id} not found." });
-            }
-
-            if (presentation.UserID != userId)
-            {
-                return StatusCode(StatusCodes.Status403Forbidden, new { message = "User is not authorized to delete this presentation." });
-            }
-
-            await _repository.DeleteAsync(id);
-
-            return NoContent();
         }
     }
-}
+
