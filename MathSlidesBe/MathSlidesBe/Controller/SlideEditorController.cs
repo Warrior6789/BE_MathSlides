@@ -1,8 +1,9 @@
 using System.Security.Claims;
+using MathSlidesBe.BaseRepo;
+using MathSlidesBe.Entity;
 using MathSlidesBe.Models.Dto;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 namespace MathSlidesBe.Controllers
 {
@@ -10,11 +11,11 @@ namespace MathSlidesBe.Controllers
     [ApiController]
     public class SlideEditorController : ControllerBase
     {
-        private readonly MathSlidesDbContext _context;
+        private readonly IRepository<Presentation> _presentationRepository;
 
-        public SlideEditorController(MathSlidesDbContext context)
+        public SlideEditorController(IRepository<Presentation> presentationRepository)
         {
-            _context = context;
+            _presentationRepository = presentationRepository;
         }
 
         [HttpPut("presentation")]
@@ -30,7 +31,7 @@ namespace MathSlidesBe.Controllers
                 return Unauthorized();
             }
 
-            var presentation = await _context.Presentations.FirstOrDefaultAsync(p => p.Id == request.PresentationId);
+            var presentation = await _presentationRepository.GetByIdAsync(request.PresentationId);
             if (presentation == null)
             {
                 return NotFound();
@@ -41,7 +42,7 @@ namespace MathSlidesBe.Controllers
             }
 
             presentation.Title = request.NewTitle;
-            await _context.SaveChangesAsync();
+            await _presentationRepository.UpdateAsync(presentation);
 
             return Ok(new { message = "Presentation title updated successfully." });
         }
