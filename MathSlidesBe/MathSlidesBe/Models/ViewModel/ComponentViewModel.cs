@@ -1,6 +1,4 @@
-﻿using MathSlidesBe.Controllers;
-
-namespace MathSlidesBe.Models.ViewModel
+﻿namespace MathSlidesBe.Models.ViewModel
 {
     public class ComponentViewModel
     {

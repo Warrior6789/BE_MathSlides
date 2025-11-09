@@ -15,5 +15,10 @@ namespace MathSlidesBe.Entity
 
         // Navigation
         public ICollection<Presentation> Presentations { get; set; } = new List<Presentation>();
+
+        internal T Adapt<T>()
+        {
+            throw new NotImplementedException();
+        }
     }
 }

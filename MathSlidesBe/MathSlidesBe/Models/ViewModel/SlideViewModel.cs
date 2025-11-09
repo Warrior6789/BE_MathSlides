@@ -1,6 +1,4 @@
-﻿using MathSlidesBe.Controllers;
-
-namespace MathSlidesBe.Models.ViewModel
+﻿namespace MathSlidesBe.Models.ViewModel
 {
     public class SlideViewModel
     {
@@ -9,4 +7,5 @@ namespace MathSlidesBe.Models.ViewModel
         public int PageNumber { get; set; }
         public List<ComponentViewModel>? Components { get; set; }
     }
+
 }

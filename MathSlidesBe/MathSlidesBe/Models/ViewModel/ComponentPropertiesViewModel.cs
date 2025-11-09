@@ -15,6 +15,4 @@
         public bool IsItalic { get; set; }
         public bool IsUnderline { get; set; }
     }
-
-
 }

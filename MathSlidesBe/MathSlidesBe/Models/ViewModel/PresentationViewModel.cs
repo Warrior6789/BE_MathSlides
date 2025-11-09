@@ -1,6 +1,4 @@
-﻿using MathSlidesBe.Controllers;
-
-namespace MathSlidesBe.Models.ViewModel
+﻿namespace MathSlidesBe.Models.ViewModel
 {
     public class PresentationViewModel
     {
@@ -10,5 +8,4 @@ namespace MathSlidesBe.Models.ViewModel
         public Guid LessonID { get; set; }
         public List<SlideViewModel>? Slides { get; set; }
     }
-
 }
