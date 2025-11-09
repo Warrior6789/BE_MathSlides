@@ -2,6 +2,7 @@
 
 using Microsoft.EntityFrameworkCore;
 using System.Linq.Expressions;
+using System.Transactions;
 
 namespace MathSlidesBe.BaseRepo
 {
@@ -66,6 +67,59 @@ namespace MathSlidesBe.BaseRepo
 
         public async Task<PagedResult<TEntity>> GetPagedAsync(int pageIndex, int pageSize)
     => await _dbSet.AsQueryable().Where(x => !x.IsDeleted).ToPagedResultAsync(pageIndex, pageSize);
+
+        public async Task<TEntity?> GetByIdWithIncludesAsync(Guid id, params Expression<Func<TEntity, object>>[] includes)
+        {
+            IQueryable<TEntity> query = _dbSet.Where(x => x.Id == id && !x.IsDeleted);
+            foreach (var include in includes)
+            {
+                query = query.Include(include);
+            }
+            return await query.FirstOrDefaultAsync();
+        }
+
+        public async Task<TEntity> FindAsync(Guid id)
+        {
+            return await _dbSet.FindAsync(id);
+        }
+
+        public async Task AddRangeAsync(IEnumerable<TEntity> entities)
+        {
+            foreach(var entity in entities)
+            {
+                entity.UpdatedAt = DateTime.Now;
+            }
+            await _dbSet.AddRangeAsync(entities);
+        }
+
+        public async Task RemoveRangeAsync(IEnumerable<TEntity> entites)
+        {
+            _dbSet.RemoveRange(entites);
+            await Task.CompletedTask;
+        }
+
+        public async Task<T> ExcuteInTransactionAsync<T>(Func<Task<T>> action)
+        {
+            using (var transaction = await _context.Database.BeginTransactionAsync())
+            {
+                try
+                {
+                    var result = await action();
+                    await transaction.CommitAsync();
+                    return result;
+                }
+                catch
+                {
+                    await transaction.RollbackAsync();
+                    throw;
+                }
+            }
+        }
+
+        public async Task SaveChangeAsync()
+        {
+            await _context.SaveChangesAsync();
+        }
     }
     public class PagedResult<T>
     {
