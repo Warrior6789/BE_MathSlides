@@ -47,15 +47,13 @@ namespace MathSlidesBe.Controller
         }
 
         [HttpPut("{id:guid}")]
-        public async Task<ActionResult<BaseResponse<School>>> Update(Guid id, [FromBody] School school)
+        public async Task<ActionResult<BaseResponse<object>>> Update(Guid id, School school)
         {
-            var existingSchool = await _repository.GetByIdAsync(id);
-            if (existingSchool == null)
-            {
-                return NotFound(BaseResponse<School>.Fail("Không tìm thấy trường"));
-            }
+            if (id != school.Id)
+                return BadRequest(BaseResponse<object>.Fail("ID không khớp"));
+
             await _repository.UpdateAsync(school);
-            return Ok(BaseResponse<School>.Ok(school, "Cập nhật trường thành công"));
+            return Ok(BaseResponse<object>.Ok(null, "Cập nhật thành công"));
         }
 
         [HttpDelete("{id:guid}")]
@@ -66,7 +64,7 @@ namespace MathSlidesBe.Controller
 
         }
 
-        [HttpPost("paged")]
+        [HttpGet("paged")]
         public async Task<ActionResult<BaseResponse<PagedResult<School>>>> GetPaged(
             int pageIndex = 1,
             int pageSize = 10,

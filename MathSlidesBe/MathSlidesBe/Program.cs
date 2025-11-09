@@ -19,6 +19,7 @@ namespace MathSlidesBe
                 .AddJsonOptions(options =>
                 {
                     options.JsonSerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles;
+                    options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
                 });
 
             builder.Services.AddEndpointsApiExplorer();
@@ -29,14 +30,25 @@ namespace MathSlidesBe
                 {
                     options.Cookie.Name = "myapp_auth";
                     options.Cookie.HttpOnly = true;
-                    options.Cookie.SecurePolicy = CookieSecurePolicy.None; 
-                    options.Cookie.SameSite = SameSiteMode.Lax; 
-                    options.LoginPath = "/auth/login";
-                    options.AccessDeniedPath = "/auth/denied";
+                    options.Cookie.SecurePolicy = CookieSecurePolicy.None;
+                    options.Cookie.SameSite = SameSiteMode.Lax;
                     options.SlidingExpiration = true;
                     options.ExpireTimeSpan = TimeSpan.FromMinutes(30);
+
+                    // Return 401/403 instead of redirecting for API
+                    options.Events.OnRedirectToLogin = context =>
+                    {
+                        context.Response.StatusCode = 401;
+                        return Task.CompletedTask;
+                    };
+                    options.Events.OnRedirectToAccessDenied = context =>
+                    {
+                        context.Response.StatusCode = 403;
+                        return Task.CompletedTask;
+                    };
                 });
 
+            // ✅ CORS cho React
             builder.Services.AddCors(options =>
             {
                 options.AddPolicy("AllowSpecificOrigins", policy =>
@@ -51,6 +63,7 @@ namespace MathSlidesBe
 
             var app = builder.Build();
 
+            // ✅ Static files cho uploads
             app.UseStaticFiles(new StaticFileOptions
             {
                 FileProvider = new PhysicalFileProvider(
@@ -58,14 +71,16 @@ namespace MathSlidesBe
                 RequestPath = "/Upload"
             });
 
+            // Configure the HTTP request pipeline.
             if (app.Environment.IsDevelopment())
             {
                 app.UseSwagger();
                 app.UseSwaggerUI();
             }
 
+            //app.UseHttpsRedirection(); // ✅ Tắt khi dev local
 
-            app.UseCors("AllowSpecificOrigins"); 
+            app.UseCors("AllowSpecificOrigins"); // ✅ CORS phải đứng trước Authentication
             app.UseAuthentication();
             app.UseAuthorization();
             app.MapControllers();

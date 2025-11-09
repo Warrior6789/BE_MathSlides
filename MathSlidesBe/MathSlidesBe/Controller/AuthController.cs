@@ -24,11 +24,11 @@ namespace MathSlidesBe.Controller
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] LoginRequest request)
         {
-            if(request.Email.Equals("admin") && request.Password == "1")
+            if(request.UserName.Equals("admin") && request.Password == "1")
             {
                 var claims = new List<Claim>
                 {
-                    new Claim(ClaimTypes.Name, request.Email),
+                    new Claim(ClaimTypes.Name, request.UserName),
                     new Claim(ClaimTypes.Role, UserRole.Admin.ToString()),
                     new Claim(ClaimTypes.NameIdentifier,Guid.Empty.ToString())
                 };
@@ -38,7 +38,7 @@ namespace MathSlidesBe.Controller
                 return Ok(new { message = "Login success" });
             }
 
-            var user = await _AuthRepository.FirstOrDefaultAsync(u => u.Email == request.Email);
+            var user = await _AuthRepository.FirstOrDefaultAsync(u => u.Email == request.UserName);
            
             if (user != null && user.PasswordHash == Helper.HashPassword(request.Password))
             {
@@ -77,7 +77,7 @@ namespace MathSlidesBe.Controller
                 return Ok(new
                 {
                     username = User.Identity.Name,
-                    role = User.Claims.Where(c => c.Type == ClaimTypes.Role).Select(c => c.Value),
+                    roles = User.Claims.Where(c => c.Type == ClaimTypes.Role).Select(c => c.Value),
                     userId = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value
                 });
             }

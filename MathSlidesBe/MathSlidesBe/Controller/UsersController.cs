@@ -13,11 +13,11 @@ namespace MathSlidesBe.Controller
 {
     [Route("api/[controller]")]
     [ApiController]
-    public class UserController : ControllerBase
+    public class UsersController : ControllerBase
     {
         private readonly IRepository<User> _userRepository;
         private readonly IRepository<School> _schoolRepository;
-        public UserController(IRepository<User> repository, IRepository<School> schoolRepository)
+        public UsersController(IRepository<User> repository, IRepository<School> schoolRepository)
         {
             _userRepository = repository;
             _schoolRepository = schoolRepository;
@@ -82,7 +82,7 @@ namespace MathSlidesBe.Controller
         }
 
         [Authorize(Roles = "Admin")]
-        [HttpGet("GetAllUsers")]
+        [HttpGet("GetAllUser")]
         public async Task<ActionResult<BaseResponse<PagedResult<User>>>> GetPaged(int pageIndex = 1, int pageSize = 10, string? search = null, UserStatus? status = null)
         {
             Expression<Func<User, bool>> filter = u => true;

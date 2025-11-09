@@ -1,4 +1,5 @@
-﻿using MathSlidesBe.BaseRepo;
+﻿using Mapster;
+using MathSlidesBe.BaseRepo;
 using MathSlidesBe.Common;
 using MathSlidesBe.Entity;
 using MathSlidesBe.Models.Dto;

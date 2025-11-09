@@ -8,10 +8,5 @@
 
         public Guid ChapterID { get; set; }
         public Guid GradeID { get; set; }
-
-        internal T Adapt<T>()
-        {
-            throw new NotImplementedException();
-        }
     }
 }

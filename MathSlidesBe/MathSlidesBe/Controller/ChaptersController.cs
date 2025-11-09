@@ -11,11 +11,11 @@ namespace MathSlidesBe.Controller
 {
     [Route("api/[controller]")]
     [ApiController]
-    public class ChapterController : ControllerBase
+    public class ChaptersController : ControllerBase
     {
         private readonly IRepository<Chapter> _Chapterrepository;
         private readonly IRepository<Grade> _Graderepository;
-        public ChapterController(IRepository<Chapter> chapterrepository, IRepository<Grade> gradeRepository)
+        public ChaptersController(IRepository<Chapter> chapterrepository, IRepository<Grade> gradeRepository)
         {
             _Chapterrepository = chapterrepository;
             _Graderepository = gradeRepository;
@@ -72,7 +72,7 @@ namespace MathSlidesBe.Controller
             return Ok(BaseResponse<PagedResult<Chapter>>.Ok(pagedResult,"Lấy danh sách chương phân trang thành công"));
         }
 
-        [HttpPost]
+        [HttpPost("create")]
         public async Task<ActionResult<BaseResponse<Chapter>>> Create([FromBody] ChapterDto dto)
         {
             var entity = dto.Adapt<Chapter>();
@@ -106,6 +106,13 @@ namespace MathSlidesBe.Controller
         {
             await _Chapterrepository.DeleteAsync(id);
             return Ok(BaseResponse<object>.Ok(null,"Xóa chương thành công"));
+        }
+
+        [HttpGet("by-grade/{gradeId:guid}")]
+        public async Task<ActionResult<BaseResponse<IEnumerable<Chapter>>>> GetByGradeId(Guid gradeId)
+        {
+            var chapters = await _Chapterrepository.Query(c => !c.IsDeleted && c.GradeID == gradeId).ToListAsync();
+            return Ok(BaseResponse<IEnumerable<Chapter>>.Ok(chapters, "Lấy danh sách chương theo khối thành công"));
         }
     }
 }
